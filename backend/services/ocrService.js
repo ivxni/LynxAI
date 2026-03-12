@@ -14,56 +14,35 @@ const sizeOf = require('image-size');
  * @returns {Promise<Object>} - The processing result
  */
 const processImage = async (documentId, userId) => {
-  console.log('OCR processImage started:', { documentId, userId });
   try {
-    // Get the document from the database
     const document = await Document.findById(documentId);
     if (!document) {
-      console.error('Document not found:', documentId);
       throw new Error('Document not found');
     }
-    console.log('Found document:', document._id);
 
-    // Get the processing job from the database
     const processingJob = await ProcessingJob.findOne({ documentId });
     if (!processingJob) {
-      console.error('Processing job not found for document:', documentId);
       throw new Error('Processing job not found');
     }
-    console.log('Found processing job:', processingJob._id);
 
-    // Update job status to processing
     processingJob.status = 'processing';
     processingJob.startTime = new Date();
     processingJob.progress = 10;
     await processingJob.save();
-    console.log('Updated processing job to processing status');
 
-    // Get the file path
     const filePath = path.join(__dirname, '..', document.originalFileUrl);
-    console.log('Looking for file at path:', filePath);
     if (!fs.existsSync(filePath)) {
-      console.error('File not found at path:', filePath);
       throw new Error('File not found');
     }
-    console.log('Found file at path:', filePath);
 
-    // Read the file as base64
     const fileBuffer = fs.readFileSync(filePath);
     const base64Image = fileBuffer.toString('base64');
     const fileType = document.originalFileType || 'image/jpeg';
-    console.log('Read file of type:', fileType, 'size:', fileBuffer.length);
 
-    // Update progress
     processingJob.progress = 30;
     await processingJob.save();
-    console.log('Updated processing job progress to 30%');
 
-    // Initialize Mistral client
-    console.log('Initializing Mistral client with API key:', process.env.MISTRAL_API_KEY ? 'API key found' : 'API key missing');
     const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
-
-    console.log('Sending OCR request to Mistral API...');
 
     // Call Mistral OCR API with improved parameters for better special character recognition
     const ocrResponse = await client.ocr.process({
@@ -84,16 +63,6 @@ const processImage = async (documentId, userId) => {
         quality: 'high'        // Request high quality OCR
       }
     });
-
-    console.log('Received OCR response from Mistral API:', ocrResponse ? 'Response received' : 'No response');
-    // Log the structure of the OCR response for debugging
-    console.log('OCR response structure:', JSON.stringify({
-      hasPages: !!ocrResponse.pages,
-      pageCount: ocrResponse.pages ? ocrResponse.pages.length : 0,
-      firstPageKeys: ocrResponse.pages && ocrResponse.pages[0] ? Object.keys(ocrResponse.pages[0]) : [],
-      hasBlocks: ocrResponse.pages && ocrResponse.pages[0] && ocrResponse.pages[0].blocks ? true : false,
-      blockCount: ocrResponse.pages && ocrResponse.pages[0] && ocrResponse.pages[0].blocks ? ocrResponse.pages[0].blocks.length : 0
-    }, null, 2));
 
     // Update progress
     processingJob.progress = 70;
@@ -119,17 +88,11 @@ const processImage = async (documentId, userId) => {
     const pdfFileName = `${document.originalFileName.split('.')[0]}.pdf`;
     const pdfFilePath = path.join(userDir, pdfFileName);
 
-    // IMPROVED PDF CREATION: Create a PDF with extracted content from the image
     await createExactPDF(fileBuffer, pdfFilePath, document.originalFileName, ocrResponse);
 
-    // Update document with PDF info
     document.pdfFileName = pdfFileName;
     document.pdfFileSize = fs.statSync(pdfFilePath).size;
     document.pdfFileUrl = `/uploads/${userId}/${pdfFileName}`;
-    
-    // Log the final PDF location
-    console.log('Generated PDF file:', pdfFilePath);
-    console.log('PDF URL path:', document.pdfFileUrl);
     
     await document.save();
 
@@ -228,11 +191,8 @@ async function createExactPDF(imageBuffer, outputPath, fileName, ocrResponse) {
     // Extract content from OCR response
     const pages = ocrResponse.pages || [];
     
-    // Stelle sicher, dass wir gültige Seiten haben
     if (!pages.length) {
-      console.log('Keine Seiten in der OCR-Antwort gefunden. Erstelle eine einfache PDF mit dem Bild.');
-      
-      // Füge nur das Bild ein, wenn keine OCR-Daten verfügbar sind
+      // No OCR data available, embed the original image as fallback
       try {
         pdfDoc.image(imageBuffer, {
           fit: [500, 700],
@@ -240,9 +200,9 @@ async function createExactPDF(imageBuffer, outputPath, fileName, ocrResponse) {
           valign: 'center'
         });
       } catch (imageError) {
-        console.error('Fehler beim Einbetten des Bildes:', imageError);
+        console.error('Failed to embed image:', imageError);
         pdfDoc.fontSize(12).font('Helvetica-Bold').text(
-          'Das Originalbild konnte nicht eingebettet werden.',
+          'Original image could not be embedded.',
           { align: 'center' }
         );
       }
@@ -256,10 +216,7 @@ async function createExactPDF(imageBuffer, outputPath, fileName, ocrResponse) {
       });
     }
 
-    // Immer alle erkannten Inhalte auf eine einzige Seite setzen
-    console.log('Kombiniere alle erkannten Inhalte auf eine Seite (optimiert)');
-    
-    // Kombiniere Texte aller Seiten
+    // Merge all recognized content onto a single page
     let allBlocks = [];
     let allLayouts = [];
     let allMarkdown = '';
@@ -272,20 +229,17 @@ async function createExactPDF(imageBuffer, outputPath, fileName, ocrResponse) {
         allLayouts = allLayouts.concat(page.layout);
       }
       if (page.markdown) {
-        // Post-process the markdown to fix common OCR issues
         const processed = postProcessOcrText(page.markdown);
         allMarkdown += processed + '\n\n';
       }
     });
     
-    // Erstelle ein kombiniertes Seitenobject
     const combinedPage = {
       blocks: allBlocks.length > 0 ? allBlocks : undefined,
       layout: allLayouts.length > 0 ? allLayouts : undefined,
       markdown: allMarkdown || undefined
     };
     
-    // Verarbeite diese eine kombinierte Seite
     processPageOptimized(pdfDoc, combinedPage);
     
     // Finalize the PDF
@@ -303,84 +257,54 @@ async function createExactPDF(imageBuffer, outputPath, fileName, ocrResponse) {
 }
 
 /**
- * Verarbeitet eine einzelne Seite für das PDF - optimiert für mehr Inhalt auf einer Seite
- * @param {PDFDocument} pdfDoc - Das PDFKit-Dokument
- * @param {Object} page - Die Seiten-Daten
+ * Renders a single page into the PDF with compact formatting.
+ * Supports structured blocks, layout elements, and markdown fallback.
  */
 function processPageOptimized(pdfDoc, page) {
-  // Check if we have detailed block information for formatting
   if (page.blocks && Array.isArray(page.blocks) && page.blocks.length > 0) {
-    console.log(`Processing ${page.blocks.length} text blocks with optimized formatting`);
-    
-    // Process each block maintaining structure
     let currentSection = null;
     let inList = false;
     let isFirstBlock = true;
     
     for (const block of page.blocks) {
       if (block.type === 'text' && block.text) {
-        // Determine font style based on block properties
         const isBold = block.bold || false;
         const isItalic = block.italic || false;
-        
-        // Kleinere Schriftgrößen für alles
         let fontSize = block.fontSize ? Math.max(8, block.fontSize * 0.85) : 10;
-        
-        // Detect section headings based on font size or style
         const isHeading = isBold || fontSize >= 12;
         
-        // Anrede erkennen (z.B. "Sehr geehrte", "Liebe", usw.)
+        // Detect German-style salutations for special formatting
         const isGreeting = block.text.match(/^(Sehr geehrte|Liebe|Hallo|Guten Tag|Betreff)/i);
         
         if (isHeading && currentSection !== block.text) {
-          // Start a new section with reduced space before
           if (!isFirstBlock) {
-            pdfDoc.moveDown(0.5); // Reduzierter Abstand vor Überschriften
+            pdfDoc.moveDown(0.5);
           }
           currentSection = block.text;
           
-          // Set font based on style with smaller font size
           pdfDoc.font('Helvetica-Bold').fontSize(Math.min(14, Math.max(12, fontSize)));
+          pdfDoc.text(block.text, { align: 'left', lineGap: 2 });
           
-          // Add text with alignment if available
-          pdfDoc.text(block.text, {
-            align: 'left',
-            lineGap: 2 // Reduzierter Zeilenabstand
-          });
-          
-          // Dünnere Trennlinie
           pdfDoc.moveDown(0.3);
           const lineWidth = pdfDoc.widthOfString(block.text);
           pdfDoc
             .moveTo(pdfDoc.x, pdfDoc.y)
             .lineTo(pdfDoc.x + Math.min(lineWidth, 300), pdfDoc.y)
-            .lineWidth(0.5) // Dünnere Linie
+            .lineWidth(0.5)
             .stroke();
           
           pdfDoc.moveDown(0.3);
           inList = false;
         } else if (isGreeting) {
-          // Anrede mit kleinerer Schrift und weniger Abstand
-          if (isBold) {
-            pdfDoc.font('Helvetica-Bold');
-          } else {
-            pdfDoc.font('Helvetica');
-          }
-          
-          pdfDoc.fontSize(10); // Kleinere Schrift für Anrede
+          pdfDoc.font(isBold ? 'Helvetica-Bold' : 'Helvetica').fontSize(10);
           
           if (!isFirstBlock) {
             pdfDoc.moveDown(0.3);
           }
           
-          pdfDoc.text(block.text, {
-            align: 'left',
-            lineGap: 1 // Sehr geringer Zeilenabstand
-          });
-          
+          pdfDoc.text(block.text, { align: 'left', lineGap: 1 });
           pdfDoc.moveDown(0.3);
         } else {
-          // Set font based on style - VORSICHT: Nur Standardschriften verwenden!
           if (isBold && isItalic) {
             pdfDoc.font('Helvetica-BoldOblique');
           } else if (isBold) {
@@ -391,61 +315,49 @@ function processPageOptimized(pdfDoc, page) {
             pdfDoc.font('Helvetica');
           }
           
-          // Set smaller font size
           pdfDoc.fontSize(fontSize);
           
-          // Check if this is a new paragraph
           if (!inList && block.text.trim() !== '') {
-            const isIndented = block.x > 60; // Detect if this is indented
+            const isIndented = block.x > 60;
             
-            // Add text with alignment if available
             pdfDoc.text(block.text, {
               align: block.alignment || 'left',
-              indent: isIndented ? 15 : 0, // Reduzierte Einrückung
-              paragraphGap: 3, // Reduzierter Abstand zwischen Absätzen
-              lineGap: 1 // Reduzierter Zeilenabstand
+              indent: isIndented ? 15 : 0,
+              paragraphGap: 3,
+              lineGap: 1
             });
             
-            // Only add minimal space if not empty
             if (block.text.trim() !== '') {
-              pdfDoc.moveDown(0.3); // Reduzierter Abstand
+              pdfDoc.moveDown(0.3);
             }
           } else {
-            // Continue list or paragraph
             pdfDoc.text(block.text, {
               align: block.alignment || 'left',
-              indent: inList ? 15 : 0, // Reduzierte Einrückung
+              indent: inList ? 15 : 0,
               continued: false,
-              lineGap: 1 // Reduzierter Zeilenabstand
+              lineGap: 1
             });
-            pdfDoc.moveDown(0.3); // Reduzierter Abstand
+            pdfDoc.moveDown(0.3);
           }
         }
       } else if (block.type === 'heading' && block.text) {
-        // Headings with optimized formatting
         const level = block.level || 1;
-        // Kleinere Überschriften
         const fontSize = level === 1 ? 14 : level === 2 ? 12 : 11;
         
-        // Add reduced space before headings
         if (!isFirstBlock) {
           pdfDoc.moveDown(0.5);
         }
         
         pdfDoc.font('Helvetica-Bold').fontSize(fontSize);
-        pdfDoc.text(block.text, {
-          align: 'left',
-          lineGap: 2 // Reduzierter Zeilenabstand
-        });
+        pdfDoc.text(block.text, { align: 'left', lineGap: 2 });
         
-        // Add a thinner separator line for major headings
         if (level <= 2) {
           pdfDoc.moveDown(0.3);
           const lineWidth = pdfDoc.widthOfString(block.text);
           pdfDoc
             .moveTo(pdfDoc.x, pdfDoc.y)
             .lineTo(pdfDoc.x + Math.min(lineWidth, 300), pdfDoc.y)
-            .lineWidth(0.5) // Dünnere Linie
+            .lineWidth(0.5)
             .stroke();
         }
         
@@ -453,22 +365,21 @@ function processPageOptimized(pdfDoc, page) {
         currentSection = block.text;
         inList = false;
       } else if (block.type === 'list' && block.items && Array.isArray(block.items)) {
-        // Lists with optimized formatting
-        pdfDoc.font('Helvetica').fontSize(10); // Kleinere Schrift für Listen
+        pdfDoc.font('Helvetica').fontSize(10);
         
         block.items.forEach((item, index) => {
           inList = true;
           const bulletPoint = block.ordered ? `${index+1}. ` : '• ';
           
           pdfDoc.text(bulletPoint + item, {
-            indent: 15, // Reduzierte Einrückung
+            indent: 15,
             align: 'left',
-            paragraphGap: 2, // Reduzierter Abstand
-            lineGap: 1 // Reduzierter Zeilenabstand
+            paragraphGap: 2,
+            lineGap: 1
           });
           
           if (index < block.items.length - 1) {
-            pdfDoc.moveDown(0.2); // Minimaler Abstand zwischen Listenelementen
+            pdfDoc.moveDown(0.2);
           }
         });
         
@@ -479,9 +390,6 @@ function processPageOptimized(pdfDoc, page) {
       isFirstBlock = false;
     }
   } else if (page.layout && Array.isArray(page.layout) && page.layout.length > 0) {
-    // Alternative format: Using layout elements
-    console.log(`Processing ${page.layout.length} layout elements with optimization`);
-    
     let currentY = pdfDoc.y;
     let columnPositions = [];
     
@@ -501,7 +409,6 @@ function processPageOptimized(pdfDoc, page) {
     // Second pass: add content with better formatting
     for (const element of page.layout) {
       if (element.type === 'text' && element.text) {
-        // Kleinere Schriftgröße für alles
         const fontSize = element.fontSize ? Math.max(8, element.fontSize * 0.85) : 10;
         const isBold = element.bold || false;
         const isItalic = element.italic || false;
@@ -527,7 +434,7 @@ function processPageOptimized(pdfDoc, page) {
           if (columnIndex >= 0) {
             // Calculate the width of this column
             const nextColumnX = columnPositions[columnIndex + 1] || pdfDoc.page.width - pdfDoc.page.margins.right;
-            const columnWidth = nextColumnX - columnPositions[columnIndex] - 5; // Reduzierter Abstand
+            const columnWidth = nextColumnX - columnPositions[columnIndex] - 5;
             
             // Calculate x position in the PDF (adjust for margins)
             const pdfX = pdfDoc.page.margins.left + (columnPositions[columnIndex] * 0.75); // Scale factor
@@ -535,38 +442,36 @@ function processPageOptimized(pdfDoc, page) {
             // If different row, move down
             if (element.y && currentY !== element.y) {
               currentY = element.y;
-              pdfDoc.moveDown(0.2); // Reduzierter Abstand
+              pdfDoc.moveDown(0.2);
             }
             
             // Position text at the correct column
             pdfDoc.text(element.text, pdfX, pdfDoc.y, {
               width: columnWidth,
               align: element.alignment || 'left',
-              lineGap: 1 // Reduzierter Zeilenabstand
+              lineGap: 1
             });
           } else {
-            // Normal text
             pdfDoc.text(element.text, {
               align: element.alignment || 'left',
-              lineGap: 1 // Reduzierter Zeilenabstand
+              lineGap: 1
             });
             
-            pdfDoc.moveDown(0.3); // Reduzierter Abstand
+            pdfDoc.moveDown(0.3);
           }
         } else {
-          // Normal text
           pdfDoc.text(element.text, {
             align: element.alignment || 'left',
-            lineGap: 1 // Reduzierter Zeilenabstand
+            lineGap: 1
           });
           
-          pdfDoc.moveDown(0.3); // Reduzierter Abstand
+          pdfDoc.moveDown(0.3);
         }
       }
     }
   } else if (page.markdown) {
     // Fallback to markdown if no structured blocks
-    console.log('Using markdown content with optimized formatting');
+    // Fallback: render raw markdown content
     
     // Parse markdown content
     const lines = page.markdown.split('\n');
@@ -584,16 +489,15 @@ function processPageOptimized(pdfDoc, page) {
           pdfDoc.moveDown(0.5);
         }
         pdfDoc.fontSize(14).font('Helvetica-Bold').text(line.replace('# ', ''), {
-          lineGap: 2 // Reduzierter Zeilenabstand
+          lineGap: 2
         });
         
-        // Add a separator line
         pdfDoc.moveDown(0.3);
         const lineWidth = pdfDoc.widthOfString(line.replace('# ', ''));
         pdfDoc
           .moveTo(pdfDoc.x, pdfDoc.y)
           .lineTo(pdfDoc.x + Math.min(lineWidth, 400), pdfDoc.y)
-          .lineWidth(0.5) // Dünnere Linie
+          .lineWidth(0.5)
           .stroke();
           
         pdfDoc.moveDown(0.3);
@@ -604,16 +508,15 @@ function processPageOptimized(pdfDoc, page) {
           pdfDoc.moveDown(0.4);
         }
         pdfDoc.fontSize(12).font('Helvetica-Bold').text(line.replace('## ', ''), {
-          lineGap: 2 // Reduzierter Zeilenabstand
+          lineGap: 2
         });
         
-        // Add a thin separator line
         pdfDoc.moveDown(0.3);
         const lineWidth = pdfDoc.widthOfString(line.replace('## ', ''));
         pdfDoc
           .moveTo(pdfDoc.x, pdfDoc.y)
           .lineTo(pdfDoc.x + Math.min(lineWidth, 300), pdfDoc.y)
-          .lineWidth(0.5) // Dünnere Linie
+          .lineWidth(0.5)
           .stroke();
           
         pdfDoc.moveDown(0.3);
@@ -624,57 +527,47 @@ function processPageOptimized(pdfDoc, page) {
           pdfDoc.moveDown(0.3);
         }
         pdfDoc.fontSize(11).font('Helvetica-Bold').text(line.replace('### ', ''), {
-          lineGap: 2 // Reduzierter Zeilenabstand
+          lineGap: 2
         });
         pdfDoc.moveDown(0.3);
         inList = false;
       } else if (line.startsWith('- ') || line.startsWith('* ')) {
-        // List item
         if (!inList) {
-          // Start of a new list
           pdfDoc.moveDown(0.3);
-          listIndent = 15; // Reduzierte Einrückung
+          listIndent = 15;
           inList = true;
         }
         
         pdfDoc.fontSize(10).font('Helvetica').text(line, { 
           indent: listIndent,
-          lineGap: 1 // Reduzierter Zeilenabstand 
+          lineGap: 1
         });
-        pdfDoc.moveDown(0.2); // Minimaler Abstand zwischen Listenelementen
+        pdfDoc.moveDown(0.2);
       } else if (line.trim() === '') {
-        // Empty line
         if (inList) {
-          // End of list
           inList = false;
           pdfDoc.moveDown(0.3);
         } else {
-          pdfDoc.moveDown(0.5); // Reduzierter Absatzabstand
+          pdfDoc.moveDown(0.5);
         }
       } else {
-        // Erkenne Anrede
         const isGreeting = line.match(/^(Sehr geehrte|Liebe|Hallo|Guten Tag|Betreff)/i);
         
         if (isGreeting) {
-          // Anrede mit kleinerem Abstand
           if (!isFirstLine) {
             pdfDoc.moveDown(0.3);
           }
-          pdfDoc.fontSize(10).font('Helvetica').text(line, {
-            lineGap: 1 // Sehr geringer Zeilenabstand
-          });
+          pdfDoc.fontSize(10).font('Helvetica').text(line, { lineGap: 1 });
           pdfDoc.moveDown(0.3);
         } else {
-          // Normal text
           if (inList) {
-            // End of list
             inList = false;
             pdfDoc.moveDown(0.3);
           }
           
           pdfDoc.fontSize(10).font('Helvetica').text(line, {
             paragraphGap: 3,
-            lineGap: 1 // Reduzierter Zeilenabstand
+            lineGap: 1
           });
         }
       }
@@ -690,10 +583,7 @@ function processPageOptimized(pdfDoc, page) {
  * @returns {Promise<Object>} - The processing result
  */
 const processOCR = async (documentId, userId, options = {}) => {
-  console.log('OCR processOCR started:', { documentId, userId });
-  
   try {
-    // Get the document from the database
     const document = await Document.findById(documentId);
     if (!document) {
       throw new Error('Document not found');
@@ -794,10 +684,7 @@ const processOCR = async (documentId, userId, options = {}) => {
  * @returns {Promise<Object>} - The processing result
  */
 const processHandwriting = async (documentId, userId, options = {}) => {
-  console.log('Handwriting OCR started:', { documentId, userId });
-  
   try {
-    // Get the document from the database
     const document = await Document.findById(documentId);
     if (!document) {
       throw new Error('Document not found');

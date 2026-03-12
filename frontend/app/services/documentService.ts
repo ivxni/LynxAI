@@ -97,17 +97,10 @@ export const getPdfFileUrl = async (id: string): Promise<string> => {
       throw new Error('PDF file not found');
     }
     
-    // Korrektur des Pfads: Der pdfPath beginnt bereits mit /uploads,
-    // aber die baseURL enthält bereits /api
-    // Daher müssen wir den URL-Teil korrekt erstellen:
-    // Die baseURL enthält bereits "/api", und der pdfPath beginnt mit "/uploads"
-    // Erstellung des vollständigen URL ohne Dopplung des "/api"-Pfads
+    // Strip /api suffix from baseURL since pdfPath starts with /uploads
     const baseUrl = api.defaults.baseURL || '';
     const baseUrlWithoutApi = baseUrl.replace(/\/api$/, '');
     const pdfUrl = `${baseUrlWithoutApi}${pdfPath}`;
-    
-    console.log('PDF URL:', pdfUrl);
-    console.log('Document status:', document.status);
     
     return pdfUrl;
   } catch (error) {
@@ -119,13 +112,7 @@ export const getPdfFileUrl = async (id: string): Promise<string> => {
 // Download PDF file for viewing
 export const downloadPdfFile = async (id: string): Promise<string> => {
   try {
-    // Just return the URL for viewing in the browser
     const fileUrl = await getPdfFileUrl(id);
-    
-    console.log("Using direct PDF URL:", fileUrl);
-    
-    // For ngrok URLs, we'll open the URL in the browser rather than embedding
-    // This handles the ngrok security warning
     return fileUrl;
   } catch (error) {
     console.error('Error getting PDF URL:', error);
@@ -134,45 +121,29 @@ export const downloadPdfFile = async (id: string): Promise<string> => {
 };
 
 /**
- * Lädt die PDF-Datei herunter und gibt den lokalen Pfad zurück
- * @param id Die Dokument-ID
- * @returns Der lokale Pfad zur heruntergeladenen PDF-Datei
+ * Downloads the PDF to the device cache and returns the local file URI.
  */
 export const downloadAndSavePdf = async (id: string): Promise<string> => {
   try {
-    // Hole Dokument-Details, um den Dateinamen zu erhalten
     const document = await getDocumentById(id);
-    
-    // Check for both downloadUrl (virtual field) and pdfFileUrl (actual field)
     const pdfPath = document.downloadUrl || document.pdfFileUrl;
     
     if (!pdfPath) {
       throw new Error('PDF file not found');
     }
     
-    // Erstelle die URL zur PDF-Datei
     const baseUrl = api.defaults.baseURL || '';
     const baseUrlWithoutApi = baseUrl.replace(/\/api$/, '');
     const pdfUrl = `${baseUrlWithoutApi}${pdfPath}`;
     
-    // Bestimme den Dateinamen aus der URL oder verwende den Originalnamen
     const fileName = document.pdfFileName || document.filename || 
                     (document.originalFilename || document.originalFileName || 'document').replace(/\.[^\.]+$/, '.pdf');
     
-    // Lokaler Pfad, wohin die Datei gespeichert werden soll
     const localFilePath = `${FileSystem.cacheDirectory}${fileName}`;
     
-    console.log(`Downloading PDF from ${pdfUrl} to ${localFilePath}`);
-    
-    // Lade die Datei herunter
     const downloadResumable = FileSystem.createDownloadResumable(
       pdfUrl,
-      localFilePath,
-      {},
-      (downloadProgress) => {
-        const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
-        console.log(`Download progress: ${progress * 100}%`);
-      }
+      localFilePath
     );
     
     const downloadResult = await downloadResumable.downloadAsync();
@@ -181,7 +152,6 @@ export const downloadAndSavePdf = async (id: string): Promise<string> => {
       throw new Error('Failed to download file');
     }
     
-    console.log('PDF downloaded successfully to:', downloadResult.uri);
     return downloadResult.uri;
   } catch (error) {
     console.error('Error downloading PDF:', error);
@@ -190,28 +160,22 @@ export const downloadAndSavePdf = async (id: string): Promise<string> => {
 };
 
 /**
- * Teilt eine PDF-Datei mit anderen Apps
- * @param id Die Dokument-ID 
+ * Shares a PDF document via the native share sheet.
  */
 export const sharePdf = async (id: string): Promise<void> => {
   try {
-    // Prüfe, ob Sharing verfügbar ist
     const isAvailable = await Sharing.isAvailableAsync();
     if (!isAvailable) {
       throw new Error('Sharing is not available on this device');
     }
     
-    // Lade die PDF-Datei herunter
     const localFilePath = await downloadAndSavePdf(id);
     
-    // Teile die Datei
     await Sharing.shareAsync(localFilePath, {
       mimeType: 'application/pdf',
       dialogTitle: 'Share PDF Document',
-      UTI: 'com.adobe.pdf' // Für iOS
+      UTI: 'com.adobe.pdf'
     });
-    
-    console.log('Sharing dialog opened successfully');
   } catch (error) {
     console.error('Error sharing PDF:', error);
     throw error;

@@ -170,24 +170,8 @@ const verifyPurchase = async (userId, platform, productIdentifier, billingCycle,
       throw new Error('Invalid product identifier');
     }
     
-    // In a real implementation, you would verify with Apple's servers
-    // This is a simplified version for demonstration purposes
+    // TODO: Implement Apple receipt verification via App Store Server API
     try {
-      /* 
-      // Real implementation would look like:
-      const response = await axios.post(APPLE_API_URL, {
-        'receipt-data': receipt,
-        'password': 'your-shared-secret'
-      });
-      
-      if (response.data.status === 0) {
-        // Receipt is valid
-        isValid = true;
-        receiptData = response.data;
-      }
-      */
-      
-      // For demo, we'll assume it's valid
       isValid = true;
       receiptData = {
         expiresDate: new Date(Date.now() + (billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000)
@@ -196,9 +180,7 @@ const verifyPurchase = async (userId, platform, productIdentifier, billingCycle,
       throw new Error(`Failed to verify Apple receipt: ${error.message}`);
     }
   } else if (platform === 'android') {
-    // For Google
-    // Similar to Apple, you would verify with Google's servers
-    // For demo, we'll assume it's valid
+    // TODO: Implement Google Play receipt verification via Google Play Developer API
     isValid = true;
     receiptData = {
       expiresDate: new Date(Date.now() + (billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000)
@@ -258,16 +240,9 @@ const restorePurchases = async (userId, platform, purchases) => {
     throw new Error('User not found');
   }
   
-  // Check if there are any active subscriptions in the purchase data
-  // This is a simplified implementation - real implementation would
-  // verify each purchase with Apple/Google servers
-  
   let foundValidSubscription = false;
   let billingCycle = null;
   let expiryDate = null;
-  
-  // In a real implementation, we would process the purchases object
-  // For now, we'll just simulate finding an active subscription if purchases exists
   if (purchases && Object.keys(purchases).length > 0) {
     // Get the most recent transaction in our simplified model
     const productId = Object.keys(purchases)[0];

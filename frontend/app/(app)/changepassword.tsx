@@ -11,7 +11,7 @@ import { useDarkMode } from '../contexts/DarkModeContext';
 import useThemeColors from '../utils/useThemeColors';
 import authService from '../services/authService';
 
-// Typ für die Passwortvalidierung
+// Password validation state
 type ValidationState = {
   minLength: boolean | null;
   hasLetter: boolean | null;
@@ -34,7 +34,6 @@ export default function ChangePassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Passwortvalidierung mit initialem neutralen Zustand
   const [passwordValidation, setPasswordValidation] = useState<ValidationState>({
     minLength: null,
     hasLetter: null,
@@ -42,10 +41,8 @@ export default function ChangePassword() {
     passwordsMatch: null
   });
   
-  // Passwort in Echtzeit validieren
   useEffect(() => {
     if (newPassword.length === 0) {
-      // Wenn noch kein Passwort eingegeben wurde, alle Validierungen auf null setzen
       setPasswordValidation({
         minLength: null,
         hasLetter: null,
@@ -63,7 +60,6 @@ export default function ChangePassword() {
     }
   }, [newPassword, confirmPassword]);
   
-  // Prüfen, ob das Passwort gültig ist
   const isPasswordValid = newPassword.length > 0 && Object.values(passwordValidation).every(value => value === true);
 
   const handleChangePassword = async () => {

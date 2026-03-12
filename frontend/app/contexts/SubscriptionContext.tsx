@@ -34,7 +34,6 @@ interface SubscriptionProviderProps {
 }
 
 export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ children }) => {
-  // Initialize with placeholder data to prevent UI popping
   const [subscriptionDetails, setSubscriptionDetails] = useState<SubscriptionDetails | null>({
     plan: 'free',
     isInTrial: false,
@@ -69,16 +68,16 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     isInTrial: boolean;
     isCanceledButActive?: boolean;
   } | null>({
-    plan: 'free', // Default to free to prevent UI flashing
+    plan: 'free',
     billingCycle: undefined,
     remainingDocuments: 3,
     totalDocuments: 3, // 3 documents per day for free users
     isInTrial: false,
     isCanceledButActive: false,
   });
-  const [isLoading, setIsLoading] = useState(false); // Start as false to prevent loading screens
+  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(true); // Start as true to show UI immediately
+  const [isInitialized, setIsInitialized] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const lastFetchTime = useRef<number>(0);
   const cacheTime = 30000; // 30 seconds cache

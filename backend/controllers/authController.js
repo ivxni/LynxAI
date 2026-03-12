@@ -15,11 +15,8 @@ const appleSignIn = async (req, res, next) => {
       return next(error);
     }
 
-    // For development/testing: Skip Apple verification if in development mode
+    // Dev mode: bypass Apple token verification when SKIP_APPLE_VERIFICATION is set
     if (process.env.NODE_ENV === 'development' && process.env.SKIP_APPLE_VERIFICATION === 'true') {
-      console.log('Development mode: Skipping Apple token verification');
-      
-      // Use a mock Apple user ID for development
       const appleUserId = user || `dev_user_${Date.now()}`;
       const appleEmail = email || `dev_user_${Date.now()}@apple.private`;
       
@@ -37,7 +34,6 @@ const appleSignIn = async (req, res, next) => {
         });
       }
 
-      // Create new user for development
       const newUser = await User.create({
         appleId: appleUserId,
         email: appleEmail,

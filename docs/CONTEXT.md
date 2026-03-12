@@ -1,6 +1,6 @@
 # Mistral OCR Mobile App - Overview & Workflow
 
-App Name: LynxAI
+App Name: SnapOCR
 
 This document outlines the structure, flow, and features of our Mistral OCR mobile application built with Expo (React Native) on the frontend, Node.js/Express on the backend, and MongoDB for data storage. The goal is to guide developers in understanding the user experience (UX), the technical steps involved, and how each component should interact.
 
@@ -21,7 +21,7 @@ Tech Stack:
 Frontend: React Native with TypeScript, Expo, and Expo Router and axios
 Backend/Database: NodeJS express axios and dotenv / mongoDB
 UI Framework: React Native Paper
-AI Processing: Claude
+AI Processing: Mistral AI (OCR)
 
 
 1. **Expo/React Native Frontend**  

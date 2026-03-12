@@ -37,17 +37,13 @@ interface PurchasesPackage {
   };
 }
 
-// Versuche react-native-purchases nur in nativem Kontext zu importieren
+// RevenueCat SDK is only available in native builds, not Expo Go
 try {
   if (!Constants.expoConfig?.extra?.isExpoGo) {
-    // Nur laden, wenn wir nicht in Expo Go sind
     Purchases = require('react-native-purchases').default;
-    console.log('Loaded real Purchases module');
-  } else {
-    console.log('Using mock Purchases in Expo Go');
   }
 } catch (error) {
-  console.log('Using mock Purchases due to import error:', error);
+  // Falls back to mock when SDK is unavailable
 }
 
 // Get RevenueCat API keys from app.json extra
@@ -90,9 +86,7 @@ api.interceptors.request.use(
 const initializePurchases = async (userId: string) => {
   if (Platform.OS === 'ios' || Platform.OS === 'android') {
     try {
-      // Prüfen, ob wir in Expo Go sind
       if (Constants.expoConfig?.extra?.isExpoGo) {
-        console.log('Skipping real Purchases initialization in Expo Go');
         return;
       }
       

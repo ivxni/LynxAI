@@ -131,43 +131,35 @@ export default function DocView() {
   // Function to pick and manipulate image with expanded options
   const pickImage = async () => {
     try {
-      // Erst die Berechtigungen prüfen
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Fehler', 'Kamera-Zugriff wird benötigt, um Bilder aufzunehmen.');
+        Alert.alert('Error', 'Camera access is required to capture images.');
         return;
       }
 
-      // Open image picker with advanced options
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false, // Wir deaktivieren das direkte Bearbeiten, um unsere eigene UI zu verwenden
+        allowsEditing: false,
         quality: 1,
         allowsMultipleSelection: false,
-        exif: true, // EXIF-Daten erhalten für bessere Bildqualität
+        exif: true,
       });
 
       if (!result.canceled) {
-        // Vorverarbeitung des Bildes
         const originalUri = result.assets[0].uri;
         setImageUri(originalUri);
         
-        // Frage den Benutzer nach der gewünschten Bearbeitung
         Alert.alert(
-          'Bild bearbeiten',
-          'Wie möchten Sie das Bild bearbeiten?',
+          'Edit Image',
+          'How would you like to edit the image?',
           [
             {
-              text: 'Nicht bearbeiten',
-              onPress: () => {
-                console.log('Keine Bearbeitung gewählt');
-              }
+              text: 'Skip',
+              onPress: () => {}
             },
             {
-              text: 'Zuschneiden',
+              text: 'Crop',
               onPress: async () => {
-                console.log('Zuschneiden gewählt');
-                // Implementiere die Zuschneidefunktion mit ImageManipulator
                 try {
                   const manipResult = await ImageManipulator.manipulateAsync(
                     originalUri,

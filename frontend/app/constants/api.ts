@@ -1,4 +1,4 @@
-export const API_URL: string = 'https://af1844622c94.ngrok-free.app/api';
+export const API_URL: string = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 export interface ApiEndpoints {
   REGISTER: string;

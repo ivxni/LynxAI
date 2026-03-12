@@ -69,11 +69,7 @@ export default function FamilyDashboard() {
   const loadFamilyGroup = async () => {
     try {
       setLoading(true);
-      // TODO: Implement API call to fetch family group
-      // const response = await familyService.getFamilyGroup();
-      // setFamilyGroup(response.data);
-      
-      // Mock data for now
+      // Placeholder data until the family API endpoint is connected
       setFamilyGroup({
         _id: '1',
         name: 'Johnson Family',
@@ -136,8 +132,6 @@ export default function FamilyDashboard() {
 
     try {
       setInviting(true);
-      // TODO: Implement API call to invite member
-      // await familyService.inviteMember(inviteEmail);
       
       Alert.alert('Success', `Invitation sent to ${inviteEmail}`);
       setInviteEmail('');
@@ -161,8 +155,6 @@ export default function FamilyDashboard() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // TODO: Implement API call to remove member
-              // await familyService.removeMember(memberId);
               Alert.alert('Success', `${memberName} has been removed from your family plan`);
               await loadFamilyGroup();
             } catch (error) {
