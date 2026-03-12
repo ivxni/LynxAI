@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "SnapOCR",
+    "slug": "snapocr",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.snapocr.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to scan documents for OCR processing.",
+        "NSPhotoLibraryUsageDescription": "This app accesses your photos to allow you to upload documents for OCR processing."
+      }
+    },
+    "android": {
+      "package": "com.snapocr.app",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "scheme": "snapocr",
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Die App benötigt Zugriff auf Ihre Fotos, um Dokumente zu scannen.",
+          "cameraPermission": "Die App benötigt Zugriff auf Ihre Kamera, um Dokumente zu scannen.",
+          "microphonePermission": "Die App benötigt Zugriff auf Ihr Mikrofon."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Die App benötigt Zugriff auf Ihre Fotos, um Dokumente zu speichern.",
+          "savePhotosPermission": "Die App benötigt Zugriff, um Dokumente in Ihrer Mediathek zu speichern.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      "expo-localization",
+      "expo-apple-authentication"
+    ],
+    "extra": {
+      "revenueCat": {
+        "iosApiKey": "appl_UPsMcxwapvADbJSxEwqzUGPUhqX",
+        "androidApiKey": "goog_YOUR_REVENUECAT_ANDROID_API_KEY"
+      }
+    }
+  }
+}
